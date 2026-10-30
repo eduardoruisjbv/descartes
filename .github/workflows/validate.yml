@@ -1,0 +1,26 @@
+name: Validate
+on:
+  push:
+  pull_request:
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check required files and metadata
+        run: |
+          test -f README.md && test -f SKILL.md && test -f LICENSE
+          grep -q '^name: descartes$' SKILL.md
+          grep -q 'cogito, ergo sum' README.md
+          python - <<'PY'
+          import re
+          from pathlib import Path
+          files = list(Path('.').rglob('*.md'))
+          missing=[]
+          for f in files:
+              for target in re.findall(r'\[[^]]+\]\(([^)]+)\)', f.read_text()):
+                  if target.startswith(('http:', 'https:', '#', 'mailto:')): continue
+                  path=(f.parent/target.split('#')[0]).resolve() if target.split('#')[0] else f.resolve()
+                  if not path.exists(): missing.append(f'{f}: {target}')
+          if missing: raise SystemExit('Broken links:\n'+'\n'.join(missing))
+          PY
